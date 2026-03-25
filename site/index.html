@@ -6,11 +6,11 @@
     <title>Memento Mori — Recuerda que vas a morir</title>
     <meta name="description" content="Calcula cuánto tiempo de vida te queda según datos reales de la OMS. Visualiza tus semanas vividas y restantes. Memento Mori.">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://memento-mori-app.vercel.app">
+    <link rel="canonical" href="https://memento-mori-murex.vercel.app">
     <meta property="og:title" content="Memento Mori — Calcula cuánto te queda de vida">
     <meta property="og:description" content="Esperanza de vida personalizada con datos de la OMS. Visualiza tus semanas. Gratis.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://memento-mori-app.vercel.app">
+    <meta property="og:url" content="https://memento-mori-murex.vercel.app">
     <meta property="og:locale" content="es">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Memento Mori — Calcula cuánto te queda de vida">
@@ -127,6 +127,12 @@
             transition: opacity 0.15s;
         }
         .btn-calc:hover { opacity: 0.85; }
+        .privacy-note {
+            font-size: 12px;
+            color: #555;
+            text-align: center;
+            margin-top: 4px;
+        }
 
         /* Result */
         .result {
@@ -372,6 +378,11 @@
                     <option value="heavy">Frecuente</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label>&nbsp;</label>
+                <div id="bmi-preview" style="padding:12px 14px;font-size:14px;color:var(--muted)"></div>
+            </div>
+            <p class="privacy-note full">Tus datos no se envían a ningún servidor. Todo se calcula en tu navegador.</p>
 
             <button type="submit" class="btn-calc">Calcular</button>
         </form>
@@ -381,6 +392,7 @@
     <section class="result" id="result">
         <div class="death-date" id="death-date"></div>
         <div class="death-age" id="death-age"></div>
+        <div id="result-bmi" style="font-size:13px;color:var(--muted);margin-bottom:32px"></div>
 
         <div class="countdown" id="countdown"></div>
 
@@ -485,7 +497,7 @@ COUNTRIES.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c[0];
     opt.textContent = c[0];
-    if (c[0] === 'Peru') opt.selected = true;
+    if (c[0] === 'Perú') opt.selected = true;
     countrySelect.appendChild(opt);
 });
 
@@ -583,6 +595,22 @@ function calculate() {
     document.getElementById('death-age').textContent =
         `${Math.floor(totalLE)} años — ${Math.floor(yearsLeft)} años y ${Math.floor((yearsLeft % 1) * 12)} meses restantes`;
 
+    // BMI in result
+    const bmiResultEl = document.getElementById('result-bmi');
+    if (bmi) {
+        const bmiVal = parseFloat(bmi);
+        let cat = 'normal';
+        if (bmiVal < 18.5) cat = 'bajo peso';
+        else if (bmiVal >= 25 && bmiVal < 30) cat = 'sobrepeso';
+        else if (bmiVal >= 30 && bmiVal < 35) cat = 'obesidad I';
+        else if (bmiVal >= 35) cat = 'obesidad II+';
+        const adjYears = bmiVal >= 35 ? -5 : bmiVal >= 30 ? -3 : bmiVal >= 25 ? -1 : bmiVal < 18.5 ? -2 : 0;
+        const adjText = adjYears === 0 ? 'sin ajuste' : `${adjYears > 0 ? '+' : ''}${adjYears} años`;
+        bmiResultEl.textContent = `IMC: ${bmiVal} (${cat}) → ${adjText}`;
+    } else {
+        bmiResultEl.textContent = '';
+    }
+
     // Countdown
     const cntEl = document.getElementById('countdown');
     cntEl.innerHTML = `
@@ -630,6 +658,28 @@ function calculate() {
     }, 60000); // update every minute
 }
 
+// BMI live preview
+function updateBmiPreview() {
+    const h = document.getElementById('height').value;
+    const w = document.getElementById('weight').value;
+    const el = document.getElementById('bmi-preview');
+    if (h && w) {
+        const hm = parseFloat(h) / 100;
+        const bmiVal = parseFloat(w) / (hm * hm);
+        let cat = 'Normal';
+        if (bmiVal < 18.5) cat = 'Bajo peso';
+        else if (bmiVal >= 25 && bmiVal < 30) cat = 'Sobrepeso';
+        else if (bmiVal >= 30 && bmiVal < 35) cat = 'Obesidad I';
+        else if (bmiVal >= 35) cat = 'Obesidad II+';
+        el.textContent = `IMC: ${bmiVal.toFixed(1)} (${cat})`;
+        el.style.color = bmiVal >= 18.5 && bmiVal < 25 ? '#4ade80' : bmiVal >= 30 ? '#f87171' : '#fbbf24';
+    } else {
+        el.textContent = '';
+    }
+}
+document.getElementById('height').addEventListener('input', updateBmiPreview);
+document.getElementById('weight').addEventListener('input', updateBmiPreview);
+
 // Form submit
 document.getElementById('form').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -647,7 +697,7 @@ document.getElementById('btn-share').addEventListener('click', function() {
     const deathText = document.getElementById('death-date').textContent;
     const ageText = document.getElementById('death-age').textContent;
     const pct = document.getElementById('pct-lived').textContent;
-    const text = `Memento Mori\n\nFecha estimada: ${deathText}\n${ageText}\n${pct}\n\nhttps://memento-mori-app.vercel.app`;
+    const text = `Memento Mori\n\nFecha estimada: ${deathText}\n${ageText}\n${pct}\n\nhttps://memento-mori-murex.vercel.app`;
 
     if (navigator.share) {
         navigator.share({ title: 'Memento Mori', text: text });
