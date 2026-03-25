@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memento Mori — Recuerda que vas a morir</title>
+    <meta name="description" content="Calcula cuanto tiempo de vida te queda segun datos reales de la OMS. Visualiza tus semanas vividas y restantes. Memento Mori.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://memento-mori-app.vercel.app">
+    <meta property="og:title" content="Memento Mori — Calcula cuanto te queda de vida">
+    <meta property="og:description" content="Esperanza de vida personalizada con datos de la OMS. Visualiza tus semanas. Gratis.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://memento-mori-app.vercel.app">
+    <meta property="og:locale" content="es">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Memento Mori — Calcula cuanto te queda de vida">
+    <meta name="twitter:description" content="Esperanza de vida personalizada con datos de la OMS. Visualiza tus semanas vividas y restantes.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💀</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0a;
+            --text: #e5e5e5;
+            --muted: #888;
+            --accent: #e5e5e5;
+            --dim: #333;
+            --lived: #555;
+            --remaining: #e5e5e5;
+            --gone: rgba(255,50,50,0.15);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container { max-width: 640px; margin: 0 auto; padding: 0 24px; }
+
+        /* Header */
+        header {
+            padding: 60px 0 40px;
+            text-align: center;
+        }
+        header h1 {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--muted);
+            font-weight: 400;
+        }
+        .tagline {
+            font-size: clamp(28px, 5vw, 40px);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-top: 12px;
+            line-height: 1.15;
+        }
+
+        /* Form */
+        .form-section {
+            padding: 32px 0;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-group.full { grid-column: 1 / -1; }
+        .form-group label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+        .form-group select,
+        .form-group input {
+            background: #161616;
+            border: 1px solid #2a2a2a;
+            color: var(--text);
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+        .form-group select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+        .form-group input:focus,
+        .form-group select:focus { border-color: #555; }
+        .form-group input[type="number"] { -moz-appearance: textfield; }
+        .form-group input::-webkit-outer-spin-button,
+        .form-group input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+        .optional-label {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 24px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            grid-column: 1 / -1;
+        }
+
+        .btn-calc {
+            grid-column: 1 / -1;
+            margin-top: 8px;
+            padding: 14px;
+            background: #fff;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: opacity 0.15s;
+        }
+        .btn-calc:hover { opacity: 0.85; }
+
+        /* Result */
+        .result {
+            display: none;
+            padding: 48px 0;
+            text-align: center;
+        }
+        .result.visible { display: block; }
+
+        .death-date {
+            font-size: clamp(24px, 4vw, 36px);
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            margin-bottom: 8px;
+        }
+        .death-age {
+            font-size: 16px;
+            color: var(--muted);
+            margin-bottom: 32px;
+        }
+
+        .countdown {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+        .countdown-item {
+            background: #161616;
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            padding: 16px 8px;
+        }
+        .countdown-num {
+            font-size: clamp(20px, 3vw, 28px);
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+        .countdown-label {
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-top: 4px;
+        }
+
+        /* Weeks grid */
+        .weeks-section {
+            margin-top: 40px;
+            text-align: left;
+        }
+        .weeks-title {
+            font-size: 13px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .weeks-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            justify-content: center;
+        }
+        .week {
+            width: 6px;
+            height: 6px;
+            border-radius: 1px;
+        }
+        .week-lived { background: var(--lived); }
+        .week-remaining { background: var(--remaining); opacity: 0.15; }
+        .week-legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .week-legend span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 1px;
+            display: inline-block;
+        }
+
+        /* Percentage bar */
+        .life-bar {
+            margin: 32px 0;
+        }
+        .life-bar-track {
+            height: 8px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .life-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #555, #e5e5e5);
+            border-radius: 4px;
+            transition: width 0.8s ease;
+        }
+        .life-bar-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        /* Message */
+        .message {
+            margin-top: 40px;
+            padding: 24px;
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 12px;
+            font-size: 16px;
+            line-height: 1.7;
+            color: var(--muted);
+            font-style: italic;
+        }
+
+        /* Share */
+        .share-section {
+            margin-top: 32px;
+        }
+        .btn-share {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid #333;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .btn-share:hover { color: var(--text); border-color: #555; }
+        .btn-recalc {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid #333;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+            margin-left: 8px;
+        }
+        .btn-recalc:hover { color: var(--text); border-color: #555; }
+
+        /* Footer */
+        footer {
+            padding: 48px 0;
+            text-align: center;
+            font-size: 13px;
+            color: #444;
+        }
+        footer a { color: #666; text-decoration: none; }
+        footer a:hover { color: var(--text); }
+
+        @media (max-width: 480px) {
+            .countdown { grid-template-columns: repeat(2, 1fr); }
+            .form-grid { grid-template-columns: 1fr; }
+            .week { width: 5px; height: 5px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Memento Mori</h1>
+        <div class="tagline">Recuerda que vas a morir</div>
+    </header>
+
+    <!-- Form -->
+    <section class="form-section">
+        <form id="form" class="form-grid">
+            <div class="form-group">
+                <label for="birth">Fecha de nacimiento</label>
+                <input type="date" id="birth" required>
+            </div>
+            <div class="form-group">
+                <label for="sex">Sexo</label>
+                <select id="sex" required>
+                    <option value="">Seleccionar</option>
+                    <option value="M">Hombre</option>
+                    <option value="F">Mujer</option>
+                </select>
+            </div>
+            <div class="form-group full">
+                <label for="country">Pais</label>
+                <select id="country" required>
+                    <option value="">Seleccionar</option>
+                </select>
+            </div>
+
+            <div class="optional-label">Opcional — ajusta tu estimado</div>
+
+            <div class="form-group">
+                <label for="smoker">Fumador</label>
+                <select id="smoker">
+                    <option value="no">No</option>
+                    <option value="ex">Ex-fumador</option>
+                    <option value="yes">Si, fumo</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="exercise">Ejercicio</label>
+                <select id="exercise">
+                    <option value="moderate">Moderado</option>
+                    <option value="none">Sedentario</option>
+                    <option value="active">Activo (5+h/sem)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="bmi">BMI (indice de masa)</label>
+                <input type="number" id="bmi" placeholder="ej: 24" min="12" max="60" step="0.1">
+            </div>
+            <div class="form-group">
+                <label for="alcohol">Alcohol</label>
+                <select id="alcohol">
+                    <option value="moderate">Moderado</option>
+                    <option value="none">No bebo</option>
+                    <option value="heavy">Frecuente</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn-calc">Calcular</button>
+        </form>
+    </section>
+
+    <!-- Result -->
+    <section class="result" id="result">
+        <div class="death-date" id="death-date"></div>
+        <div class="death-age" id="death-age"></div>
+
+        <div class="countdown" id="countdown"></div>
+
+        <div class="life-bar">
+            <div class="life-bar-track">
+                <div class="life-bar-fill" id="life-bar-fill"></div>
+            </div>
+            <div class="life-bar-labels">
+                <span>Nacimiento</span>
+                <span id="pct-lived"></span>
+                <span id="death-label">Muerte estimada</span>
+            </div>
+        </div>
+
+        <div class="weeks-section">
+            <div class="weeks-title">Cada punto = 1 semana de tu vida</div>
+            <div class="weeks-grid" id="weeks-grid"></div>
+            <div class="week-legend">
+                <span><span class="legend-dot" style="background:var(--lived)"></span> Vividas</span>
+                <span><span class="legend-dot" style="background:var(--remaining);opacity:0.15"></span> Restantes</span>
+            </div>
+        </div>
+
+        <div class="message" id="message"></div>
+
+        <div class="share-section">
+            <button class="btn-share" id="btn-share">Compartir resultado</button>
+            <button class="btn-recalc" id="btn-recalc">Recalcular</button>
+        </div>
+    </section>
+
+    <footer>
+        <p>Datos de esperanza de vida: OMS 2024. Los ajustes por estilo de vida se basan en estudios epidemiologicos publicados.</p>
+        <p style="margin-top:8px">Esto no es un diagnostico medico. Es un recordatorio.</p>
+        <p style="margin-top:16px"><a href="https://github.com/MagnusCole">MagnusCole</a></p>
+    </footer>
+</div>
+
+<script>
+// ── Life expectancy data (WHO 2024 — top 50 countries + all Latam) ──
+// Format: [country_name, male_life_exp, female_life_exp]
+const COUNTRIES = [
+    ["Alemania", 78.7, 83.4],
+    ["Argentina", 73.4, 79.9],
+    ["Australia", 81.3, 85.4],
+    ["Austria", 79.4, 84.0],
+    ["Belgica", 79.3, 83.9],
+    ["Bolivia", 65.5, 71.1],
+    ["Brasil", 72.8, 80.0],
+    ["Canada", 80.4, 84.7],
+    ["Chile", 78.1, 83.2],
+    ["China", 75.0, 80.5],
+    ["Colombia", 73.7, 80.0],
+    ["Corea del Sur", 80.3, 86.1],
+    ["Costa Rica", 77.8, 82.8],
+    ["Cuba", 76.0, 80.4],
+    ["Dinamarca", 79.6, 83.1],
+    ["Ecuador", 74.4, 79.9],
+    ["El Salvador", 68.8, 77.4],
+    ["Espana", 80.7, 86.2],
+    ["Estados Unidos", 76.3, 81.4],
+    ["Filipinas", 67.4, 75.6],
+    ["Finlandia", 79.2, 84.4],
+    ["Francia", 79.5, 85.3],
+    ["Guatemala", 70.2, 77.1],
+    ["Haiti", 62.1, 66.4],
+    ["Honduras", 72.0, 77.0],
+    ["India", 68.2, 70.7],
+    ["Indonesia", 69.6, 73.7],
+    ["Irlanda", 80.5, 84.0],
+    ["Israel", 81.0, 84.6],
+    ["Italia", 81.0, 85.2],
+    ["Japon", 81.5, 87.6],
+    ["Mexico", 72.6, 78.6],
+    ["Nicaragua", 72.6, 78.8],
+    ["Nigeria", 52.7, 54.7],
+    ["Noruega", 81.6, 84.7],
+    ["Nueva Zelanda", 80.5, 83.9],
+    ["Paises Bajos", 80.5, 83.6],
+    ["Panama", 75.7, 81.6],
+    ["Paraguay", 71.8, 76.8],
+    ["Peru", 74.0, 79.4],
+    ["Polonia", 74.1, 81.8],
+    ["Portugal", 78.6, 84.1],
+    ["Reino Unido", 79.4, 83.0],
+    ["Republica Dominicana", 71.3, 77.3],
+    ["Rusia", 68.2, 78.0],
+    ["Singapur", 81.4, 85.7],
+    ["Suecia", 81.6, 84.8],
+    ["Suiza", 81.7, 85.4],
+    ["Tailandia", 73.2, 80.7],
+    ["Turquia", 74.4, 80.0],
+    ["Uruguay", 74.0, 81.0],
+    ["Venezuela", 70.0, 78.1],
+    ["Vietnam", 71.6, 79.4],
+];
+
+// Populate country select
+const countrySelect = document.getElementById('country');
+COUNTRIES.sort((a, b) => a[0].localeCompare(b[0]));
+COUNTRIES.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c[0];
+    opt.textContent = c[0];
+    if (c[0] === 'Peru') opt.selected = true;
+    countrySelect.appendChild(opt);
+});
+
+// ── Lifestyle adjustments (years, based on epidemiological studies) ──
+function getAdjustment(smoker, exercise, bmi, alcohol) {
+    let adj = 0;
+
+    // Smoking: Doll & Peto (BMJ), -10 years for lifelong smokers
+    if (smoker === 'yes') adj -= 8;
+    else if (smoker === 'ex') adj -= 2;
+
+    // Exercise: Wen et al (Lancet), +3-4 years for active
+    if (exercise === 'active') adj += 3;
+    else if (exercise === 'none') adj -= 3;
+
+    // BMI: Global BMI Mortality Collaboration (Lancet)
+    if (bmi) {
+        const b = parseFloat(bmi);
+        if (b >= 35) adj -= 5;
+        else if (b >= 30) adj -= 3;
+        else if (b >= 25) adj -= 1;
+        else if (b < 18.5) adj -= 2;
+        // 18.5-24.9 = no adjustment (optimal)
+    }
+
+    // Alcohol: Wood et al (Lancet), heavy = -2 to -5 years
+    if (alcohol === 'heavy') adj -= 3;
+    else if (alcohol === 'none') adj += 0.5;
+
+    return adj;
+}
+
+// ── Calculation ──
+const MESSAGES = [
+    "El tiempo no espera. Lo que importa es lo que haces con lo que queda.",
+    "No es la cantidad de dias. Es lo que pones dentro de cada uno.",
+    "Los estoicos meditaban sobre la muerte no por tristeza, sino para vivir con urgencia.",
+    "Cada semana que pasa es un punto que se llena. No desperdicies las que quedan.",
+    "Marco Aurelio: 'No es que tengamos poco tiempo, sino que perdemos mucho.'",
+    "Nadie te prometio manana. Hoy es lo unico seguro.",
+    "La muerte no es el enemigo. La complacencia si.",
+    "Seneca: 'No es que la vida sea corta, es que la hacemos corta.'",
+];
+
+function calculate() {
+    const birthStr = document.getElementById('birth').value;
+    const sex = document.getElementById('sex').value;
+    const country = document.getElementById('country').value;
+    const smoker = document.getElementById('smoker').value;
+    const exercise = document.getElementById('exercise').value;
+    const bmi = document.getElementById('bmi').value;
+    const alcohol = document.getElementById('alcohol').value;
+
+    if (!birthStr || !sex || !country) return;
+
+    const birth = new Date(birthStr);
+    const now = new Date();
+
+    // Find country data
+    const cdata = COUNTRIES.find(c => c[0] === country);
+    if (!cdata) return;
+
+    const baseLE = sex === 'M' ? cdata[1] : cdata[2];
+    const adj = getAdjustment(smoker, exercise, bmi, alcohol);
+    const totalLE = Math.max(baseLE + adj, 30); // floor at 30
+
+    // Calculate ages and dates
+    const ageNow = (now - birth) / (365.25 * 24 * 60 * 60 * 1000);
+    const yearsLeft = Math.max(totalLE - ageNow, 0);
+    const deathDate = new Date(birth.getTime() + totalLE * 365.25 * 24 * 60 * 60 * 1000);
+
+    // Weeks
+    const weeksLived = Math.floor((now - birth) / (7 * 24 * 60 * 60 * 1000));
+    const totalWeeks = Math.floor(totalLE * 52.1775);
+    const weeksLeft = Math.max(totalWeeks - weeksLived, 0);
+
+    // Time remaining
+    const msLeft = deathDate - now;
+    const daysLeft = Math.max(Math.floor(msLeft / (24 * 60 * 60 * 1000)), 0);
+    const hoursLeft = Math.max(Math.floor(msLeft / (60 * 60 * 1000)), 0);
+
+    // ── Render ──
+    const months = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+
+    document.getElementById('death-date').textContent =
+        `${deathDate.getDate()} de ${months[deathDate.getMonth()]} de ${deathDate.getFullYear()}`;
+    document.getElementById('death-age').textContent =
+        `${Math.floor(totalLE)} anos — ${Math.floor(yearsLeft)} anos y ${Math.floor((yearsLeft % 1) * 12)} meses restantes`;
+
+    // Countdown
+    const cntEl = document.getElementById('countdown');
+    cntEl.innerHTML = `
+        <div class="countdown-item"><div class="countdown-num" id="cnt-years">${Math.floor(yearsLeft)}</div><div class="countdown-label">anos</div></div>
+        <div class="countdown-item"><div class="countdown-num" id="cnt-days">${daysLeft.toLocaleString()}</div><div class="countdown-label">dias</div></div>
+        <div class="countdown-item"><div class="countdown-num" id="cnt-hours">${hoursLeft.toLocaleString()}</div><div class="countdown-label">horas</div></div>
+        <div class="countdown-item"><div class="countdown-num" id="cnt-weeks">${weeksLeft.toLocaleString()}</div><div class="countdown-label">semanas</div></div>
+    `;
+
+    // Progress bar
+    const pct = Math.min((ageNow / totalLE) * 100, 100);
+    document.getElementById('life-bar-fill').style.width = pct.toFixed(1) + '%';
+    document.getElementById('pct-lived').textContent = pct.toFixed(1) + '% vivido';
+
+    // Weeks grid
+    const gridEl = document.getElementById('weeks-grid');
+    gridEl.innerHTML = '';
+    const maxWeeks = Math.min(totalWeeks, 5000); // cap for performance
+    for (let i = 0; i < maxWeeks; i++) {
+        const dot = document.createElement('span');
+        dot.className = 'week ' + (i < weeksLived ? 'week-lived' : 'week-remaining');
+        gridEl.appendChild(dot);
+    }
+
+    // Message
+    document.getElementById('message').textContent =
+        MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+
+    // Show result
+    document.getElementById('result').classList.add('visible');
+    document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Live countdown ticker
+    if (window._ticker) clearInterval(window._ticker);
+    window._ticker = setInterval(() => {
+        const now2 = new Date();
+        const ms = deathDate - now2;
+        if (ms <= 0) { clearInterval(window._ticker); return; }
+        const d = Math.floor(ms / 86400000);
+        const h = Math.floor(ms / 3600000);
+        const cntDays = document.getElementById('cnt-days');
+        const cntHours = document.getElementById('cnt-hours');
+        if (cntDays) cntDays.textContent = d.toLocaleString();
+        if (cntHours) cntHours.textContent = h.toLocaleString();
+    }, 60000); // update every minute
+}
+
+// Form submit
+document.getElementById('form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    calculate();
+});
+
+// Recalc button
+document.getElementById('btn-recalc').addEventListener('click', function() {
+    document.getElementById('result').classList.remove('visible');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// Share button
+document.getElementById('btn-share').addEventListener('click', function() {
+    const deathText = document.getElementById('death-date').textContent;
+    const ageText = document.getElementById('death-age').textContent;
+    const pct = document.getElementById('pct-lived').textContent;
+    const text = `Memento Mori\n\nFecha estimada: ${deathText}\n${ageText}\n${pct}\n\nhttps://memento-mori-app.vercel.app`;
+
+    if (navigator.share) {
+        navigator.share({ title: 'Memento Mori', text: text });
+    } else {
+        navigator.clipboard.writeText(text).then(() => {
+            this.textContent = 'Copiado!';
+            setTimeout(() => this.textContent = 'Compartir resultado', 2000);
+        });
+    }
+});
+</script>
+</body>
+</html>
