@@ -296,6 +296,12 @@
             margin-left: 8px;
         }
         .btn-recalc:hover { color: var(--text); border-color: #555; }
+        .share-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
 
         /* Footer */
         footer {
@@ -418,9 +424,20 @@
 
         <div class="message" id="message"></div>
 
+        <canvas id="share-canvas" style="display:none"></canvas>
+        <div id="share-preview" style="display:none;margin-top:24px">
+            <img id="share-img" style="width:100%;border-radius:12px;border:1px solid #222" />
+        </div>
+
         <div class="share-section">
-            <button class="btn-share" id="btn-share">Compartir resultado</button>
+            <button class="btn-share" id="btn-generate">Crear imagen para compartir</button>
             <button class="btn-recalc" id="btn-recalc">Recalcular</button>
+        </div>
+        <div class="share-buttons" id="share-buttons" style="display:none;margin-top:16px">
+            <button class="btn-share" id="btn-download">Descargar imagen</button>
+            <button class="btn-share" id="btn-wa">WhatsApp</button>
+            <button class="btn-share" id="btn-tw">Twitter / X</button>
+            <button class="btn-share" id="btn-copy">Copiar texto</button>
         </div>
     </section>
 
@@ -692,21 +709,211 @@ document.getElementById('btn-recalc').addEventListener('click', function() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-// Share button
-document.getElementById('btn-share').addEventListener('click', function() {
-    const deathText = document.getElementById('death-date').textContent;
-    const ageText = document.getElementById('death-age').textContent;
-    const pct = document.getElementById('pct-lived').textContent;
-    const text = `Memento Mori\n\nFecha estimada: ${deathText}\n${ageText}\n${pct}\n\nhttps://memento-mori-murex.vercel.app`;
+// ── Share image generator ──
+let _shareBlob = null;
+let _shareText = '';
 
-    if (navigator.share) {
-        navigator.share({ title: 'Memento Mori', text: text });
-    } else {
-        navigator.clipboard.writeText(text).then(() => {
-            this.textContent = 'Copiado!';
-            setTimeout(() => this.textContent = 'Compartir resultado', 2000);
-        });
+function generateShareImage() {
+    const canvas = document.getElementById('share-canvas');
+    const ctx = canvas.getContext('2d');
+    const W = 1080, H = 1350; // Instagram story ratio
+    canvas.width = W;
+    canvas.height = H;
+
+    // Background
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, W, H);
+
+    // Border glow
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(40, 40, W - 80, H - 80);
+
+    // Title
+    ctx.fillStyle = '#555';
+    ctx.font = '500 28px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('MEMENTO MORI', W / 2, 120);
+
+    // Death date
+    const deathText = document.getElementById('death-date').textContent;
+    ctx.fillStyle = '#e5e5e5';
+    ctx.font = '700 52px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText(deathText, W / 2, 210);
+
+    // Age info
+    const ageText = document.getElementById('death-age').textContent;
+    ctx.fillStyle = '#888';
+    ctx.font = '400 26px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText(ageText, W / 2, 260);
+
+    // Countdown boxes
+    const cntData = [
+        { val: document.getElementById('cnt-years')?.textContent || '0', label: 'AÑOS' },
+        { val: document.getElementById('cnt-days')?.textContent || '0', label: 'DÍAS' },
+        { val: document.getElementById('cnt-hours')?.textContent || '0', label: 'HORAS' },
+        { val: document.getElementById('cnt-weeks')?.textContent || '0', label: 'SEMANAS' },
+    ];
+    const boxW = 210, boxH = 120, boxGap = 20;
+    const totalBoxW = cntData.length * boxW + (cntData.length - 1) * boxGap;
+    let boxX = (W - totalBoxW) / 2;
+    const boxY = 310;
+
+    cntData.forEach(item => {
+        ctx.fillStyle = '#161616';
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+        ctx.fill();
+        ctx.strokeStyle = '#2a2a2a';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = '#e5e5e5';
+        ctx.font = '700 40px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(item.val, boxX + boxW / 2, boxY + 55);
+
+        ctx.fillStyle = '#666';
+        ctx.font = '500 16px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillText(item.label, boxX + boxW / 2, boxY + 90);
+
+        boxX += boxW + boxGap;
+    });
+
+    // Progress bar
+    const barY = 480, barH = 12, barX = 80, barW = W - 160;
+    const pctText = document.getElementById('pct-lived').textContent;
+    const pctVal = parseFloat(pctText) / 100;
+
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW, barH, 6);
+    ctx.fill();
+
+    const grad = ctx.createLinearGradient(barX, 0, barX + barW * pctVal, 0);
+    grad.addColorStop(0, '#555');
+    grad.addColorStop(1, '#e5e5e5');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW * pctVal, barH, 6);
+    ctx.fill();
+
+    ctx.fillStyle = '#666';
+    ctx.font = '400 18px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Nacimiento', barX, barY + 38);
+    ctx.textAlign = 'center';
+    ctx.fillText(pctText, barX + barW / 2, barY + 38);
+    ctx.textAlign = 'right';
+    ctx.fillText('Muerte estimada', barX + barW, barY + 38);
+
+    // Weeks grid (mini)
+    const gridY = 560;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#555';
+    ctx.font = '500 16px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('CADA PUNTO = 1 SEMANA DE TU VIDA', W / 2, gridY);
+
+    const dotSize = 5, dotGap = 2;
+    const dotsPerRow = Math.floor((W - 120) / (dotSize + dotGap));
+    const weeksGrid = document.getElementById('weeks-grid');
+    const totalDots = weeksGrid ? weeksGrid.children.length : 0;
+    const livedDots = weeksGrid ? weeksGrid.querySelectorAll('.week-lived').length : 0;
+    const maxDots = Math.min(totalDots, 4500);
+
+    let dx = 60, dy = gridY + 20;
+    for (let i = 0; i < maxDots; i++) {
+        ctx.fillStyle = i < livedDots ? '#666' : 'rgba(229,229,229,0.12)';
+        ctx.fillRect(dx, dy, dotSize, dotSize);
+        dx += dotSize + dotGap;
+        if ((i + 1) % dotsPerRow === 0) {
+            dx = 60;
+            dy += dotSize + dotGap;
+        }
     }
+
+    // Quote
+    const msgText = document.getElementById('message').textContent;
+    const quoteY = Math.max(dy + 40, 1100);
+
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.roundRect(80, quoteY, W - 160, 80, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#777';
+    ctx.font = 'italic 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    // Word wrap quote
+    const words = msgText.split(' ');
+    let line = '', lineY = quoteY + 35;
+    words.forEach(word => {
+        const test = line + word + ' ';
+        if (ctx.measureText(test).width > W - 200) {
+            ctx.fillText(line.trim(), W / 2, lineY);
+            line = word + ' ';
+            lineY += 28;
+        } else {
+            line = test;
+        }
+    });
+    if (line.trim()) ctx.fillText(line.trim(), W / 2, lineY);
+
+    // Watermark
+    ctx.fillStyle = '#333';
+    ctx.font = '400 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('memento-mori-murex.vercel.app', W / 2, H - 60);
+
+    // Convert to blob
+    canvas.toBlob(blob => {
+        _shareBlob = blob;
+        const url = URL.createObjectURL(blob);
+        const img = document.getElementById('share-img');
+        img.src = url;
+        document.getElementById('share-preview').style.display = 'block';
+        document.getElementById('share-buttons').style.display = 'flex';
+    }, 'image/png');
+
+    // Prepare text
+    _shareText = `Memento Mori\n\n${deathText}\n${ageText}\n${pctText}\n\nhttps://memento-mori-murex.vercel.app`;
+}
+
+// Generate image button
+document.getElementById('btn-generate').addEventListener('click', generateShareImage);
+
+// Download
+document.getElementById('btn-download').addEventListener('click', function() {
+    if (!_shareBlob) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(_shareBlob);
+    a.download = 'memento-mori.png';
+    a.click();
+});
+
+// WhatsApp
+document.getElementById('btn-wa').addEventListener('click', function() {
+    const text = encodeURIComponent(_shareText.replace(/\n/g, '\n'));
+    window.open('https://wa.me/?text=' + text, '_blank');
+});
+
+// Twitter
+document.getElementById('btn-tw').addEventListener('click', function() {
+    const deathText = document.getElementById('death-date').textContent;
+    const pctText = document.getElementById('pct-lived').textContent;
+    const text = encodeURIComponent(`Memento Mori\n\n${deathText}\n${pctText}\n\nhttps://memento-mori-murex.vercel.app`);
+    window.open('https://twitter.com/intent/tweet?text=' + text, '_blank');
+});
+
+// Copy text
+document.getElementById('btn-copy').addEventListener('click', function() {
+    navigator.clipboard.writeText(_shareText.replace(/\\n/g, '\n')).then(() => {
+        this.textContent = '¡Copiado!';
+        setTimeout(() => this.textContent = 'Copiar texto', 2000);
+    });
 });
 </script>
 </body>
